@@ -1,0 +1,13 @@
+#/Users/rishi_kaushal/terraform-azure/.terraform/providers/registry.terraform.io/hashicorp/azurerm/3.76.0/windows_386/terraform-provider-azurerm_v3.76.0_x5.exe
+#.\modules
+*.exe
+*.terraform
+*.pem
+*.tfvars
+*.tfplan
+*.tfstate
+*.tfstate.backup
+*.lock.info
+.terraform
+.DS_Store
+
