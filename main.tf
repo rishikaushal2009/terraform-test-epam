@@ -1,4 +1,3 @@
-# Specify the Azure provider and enable features
 provider "azurerm" {
   features {}
 }
@@ -6,10 +5,9 @@ provider "azurerm" {
 # Create the Azure Resource Group
 resource "azurerm_resource_group" "my_rg" {
   name     = "amdemo"
-  location = "South India"  # Corrected the location
+  location = "southindia"
 }
 
-# Define the secrets module
 module "secrets" {
   source    = "./secrets"
   location  = azurerm_resource_group.my_rg.location
@@ -53,6 +51,15 @@ resource "azurerm_network_interface" "my_network_interface" {
   }
 }
 
+data "azurerm_managed_disk" "existing" {
+  name                = "example-osdisk"  # Replace with the name of your managed disk
+  resource_group_name = azurerm_resource_group.my_rg.name  # Replace with the name of your resource group
+}
+
+locals {
+  managed_disk_exists = length(keys(data.azurerm_managed_disk.existing)) > 0
+}
+
 # Create the Azure Virtual Machine
 resource "azurerm_virtual_machine" "my_vm" {
   name                  = "my-vm"
@@ -62,9 +69,9 @@ resource "azurerm_virtual_machine" "my_vm" {
   vm_size               = "Standard_DS2_v2"
 
   storage_os_disk {
-    name              = "example-osdisk"
+    name              = local.managed_disk_exists ? data.azurerm_managed_disk.existing.id : "new-osdisk"
     caching           = "ReadWrite"
-    create_option     = "FromImage"
+    create_option     = local.managed_disk_exists ? "Attach" : "FromImage"
     managed_disk_type = "Premium_LRS"
   }
 
@@ -81,9 +88,21 @@ resource "azurerm_virtual_machine" "my_vm" {
     admin_password = module.secrets.admin_password
   }
 
-  # Copy a local script to the VM
-  os_profile {
-    custom_data = base64encode(file("userdata/bootstrap.sh"))
+  os_profile_linux_config {
+    disable_password_authentication = false
+  }
+
+  provisioner "file" {
+    source      = "userdata/bootstrap.sh"
+    destination = "/tmp/bootstrap.sh"
+    connection {
+      type        = "ssh"
+      user        = module.secrets.admin_username
+      password    = module.secrets.admin_password
+      host        = azurerm_network_interface.my_network_interface.private_ip_address
+      agent       = false
+      timeout     = "30s"
+    }
   }
 }
 
